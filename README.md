@@ -40,3 +40,9 @@ Add the package to your project in Xcode using the package URL, or add it to `Pa
      .package(url: "https://github.com/workingDog/SwiftSkyllKit.git", from: "0.1.0")
 
 See also [SkyllViewer](https://github.com/workingDog/SkyllViewer) for a basic use of **SwiftSkyllKit**
+
+
+
+## License
+
+MIT License - [LICENSE](LICENSE) file for details.
