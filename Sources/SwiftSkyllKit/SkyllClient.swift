@@ -42,7 +42,12 @@ public struct SkyllClient: Sendable {
     
     // returns [SkyllSkill]
     public func searchSkills(query: String, options: SkyllSearchOptions = .init()) async throws -> [SkyllSkill] {
-        try await search(query: query, options: options).skills
+        try await searchSkills(
+            query: query,
+            limit: options.limit,
+            includeContent: options.includeContent,
+            includeReferences: options.includeReferences
+        )
     }
 
     // returns SkyllSearchResponse
@@ -64,13 +69,11 @@ public struct SkyllClient: Sendable {
     
     // returns SkyllSearchResponse
     public func search(query: String, options: SkyllSearchOptions = .init()) async throws -> SkyllSearchResponse {
-        try await perform(
-            .search(
-                query: query,
-                limit: options.limit,
-                includeContent: options.includeContent,
-                includeReferences: options.includeReferences
-            )
+        try await search(
+            query: query,
+            limit: options.limit,
+            includeContent: options.includeContent,
+            includeReferences: options.includeReferences
         )
     }
 
@@ -146,7 +149,6 @@ public struct SkyllClient: Sendable {
         return String(data: data, encoding: .utf8)
     }
 
-    // private
     private func githubSkillMarkdownURL(from githubURL: URL?) -> URL? {
         guard let githubURL, githubURL.host == "github.com" else { return nil }
 
