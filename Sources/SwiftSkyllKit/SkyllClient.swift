@@ -11,18 +11,22 @@ public struct SkyllClient: Sendable {
     private let configuration: SkyllConfiguration
     private let transport: any SkyllTransport
     private let decoder: JSONDecoder
+    private let encoder: JSONEncoder
 
     public init(
         configuration: SkyllConfiguration = SkyllConfiguration(),
         transport: any SkyllTransport = URLSessionTransport(),
-        decoder: JSONDecoder = JSONDecoder()
+        decoder: JSONDecoder = JSONDecoder(),
+        encoder: JSONEncoder = JSONEncoder()
     ) {
         self.configuration = configuration
         self.transport = transport
         self.decoder = decoder
+        self.encoder = encoder
     }
 
-    // returns [SkyllSkill]
+    // MARK: - Search
+
     public func searchSkills(
         query: String,
         limit: Int = 10,
@@ -39,9 +43,11 @@ public struct SkyllClient: Sendable {
         )
         return response.skills
     }
-    
-    // returns [SkyllSkill]
-    public func searchSkills(query: String, options: SkyllSearchOptions = .init()) async throws -> [SkyllSkill] {
+
+    public func searchSkills(
+        query: String,
+        options: SkyllSearchOptions = .init()
+    ) async throws -> [SkyllSkill] {
         try await searchSkills(
             query: query,
             limit: options.limit,
@@ -50,7 +56,6 @@ public struct SkyllClient: Sendable {
         )
     }
 
-    // returns SkyllSearchResponse
     public func search(
         query: String,
         limit: Int = 10,
@@ -66,9 +71,11 @@ public struct SkyllClient: Sendable {
             )
         )
     }
-    
-    // returns SkyllSearchResponse
-    public func search(query: String, options: SkyllSearchOptions = .init()) async throws -> SkyllSearchResponse {
+
+    public func search(
+        query: String,
+        options: SkyllSearchOptions = .init()
+    ) async throws -> SkyllSearchResponse {
         try await search(
             query: query,
             limit: options.limit,
@@ -76,6 +83,8 @@ public struct SkyllClient: Sendable {
             includeReferences: options.includeReferences
         )
     }
+
+    // MARK: - Skill Fetching
 
     public func getSkill(named name: String) async throws -> SkyllSkill {
         try await perform(.skillByName(name))
@@ -89,68 +98,109 @@ public struct SkyllClient: Sendable {
         try await perform(.health)
     }
 
+    // MARK: - Raw / GitHub Markdown Fetching
+
+    public func fetchSkillFromRaw(for rawString: String) async throws -> String {
+        guard let rawURL = URL(string: rawString) else {
+            throw SkyllError.invalidURL
+        }
+
+        let request = URLRequest(url: rawURL)
+        let data = try await performData(request)
+
+        guard let markdown = String(data: data, encoding: .utf8) else {
+            throw SkyllError.decodingFailed(URLError(.cannotDecodeContentData))
+        }
+
+        return markdown
+    }
+
+    public func fetchSkillFromGithub(for githubString: String) async throws -> String {
+        guard let githubURL = URL(string: githubString) else {
+            throw SkyllError.invalidURL
+        }
+
+        guard let markdownURL = githubSkillMarkdownURL(from: githubURL) else {
+            throw SkyllError.invalidURL
+        }
+
+        let request = URLRequest(url: markdownURL)
+        let data = try await performData(request)
+
+        guard let markdown = String(data: data, encoding: .utf8) else {
+            throw SkyllError.decodingFailed(URLError(.cannotDecodeContentData))
+        }
+
+        return markdown
+    }
+
+    // MARK: - POST Helpers
+
+    // Use only when you already have a valid JSON object string.
+    public func postSearch(jsonString: String) async throws -> Data {
+        var request = URLRequest(url: configuration.baseURL.appending(path: "search"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data(jsonString.utf8)
+
+        return try await performData(request)
+    }
+
+    /*
+     let response: SkyllSearchResponse = try await client.postJSON(
+         body: SkyllSearchBody(query: "react performance", limit: 5),
+         as: SkyllSearchResponse.self
+     )
+     */
+    public func postJSON<Request: Encodable, Response: Decodable>(
+        body: Request,
+        as type: Response.Type
+    ) async throws -> Response {
+        var request = URLRequest(url: configuration.baseURL.appending(path: "search"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(body)
+
+        return try await perform(request)
+    }
+
+    // MARK: - Core Request Helpers
+
     private func perform<T: Decodable>(_ endpoint: SkyllEndpoint) async throws -> T {
         let request = try endpoint.makeRequest(configuration: configuration)
-        
-        let (data, response) = try await transport.send(request)
+        return try await perform(request)
+    }
 
-        let httpResponse = response
-
-        guard 200..<300 ~= httpResponse.statusCode else {
-            if let apiError = try? JSONDecoder().decode(SkyllErrorResponse.self, from: data) {
-                throw SkyllError.serverError(
-                    statusCode: httpResponse.statusCode,
-                    response: apiError
-                )
-            }
-            let body = String(data: data, encoding: .utf8)
-            throw SkyllError.requestFailed(statusCode: httpResponse.statusCode, body: body)
-        }
+    private func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let data = try await performData(request)
 
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
-            print(error)
             throw SkyllError.decodingFailed(error)
         }
     }
 
-    // get the SKILL.md content using the SkyllSkill refs raw string
-    public func fetchSkillFromRaw(for rawString: String) async throws -> String? {
-        guard let rawURL = URL(string: rawString) else {
-            throw SkyllError.invalidURL
-        }
-        
-        let (data, httpResponse) = try await transport.send(URLRequest(url: rawURL))
-        
-        guard 200..<300 ~= httpResponse.statusCode else {
+    private func performData(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await transport.send(request)
+
+        guard 200..<300 ~= response.statusCode else {
+            if let apiError = try? decoder.decode(SkyllErrorResponse.self, from: data) {
+                throw SkyllError.serverError(
+                    statusCode: response.statusCode,
+                    response: apiError
+                )
+            }
+
             let body = String(data: data, encoding: .utf8)
-            throw SkyllError.requestFailed(statusCode: httpResponse.statusCode, body: body)
-        }
-        
-        return String(data: data, encoding: .utf8)
-    }
- 
-    // get the SKILL.md content using the SkyllSkill refs github string
-    public func fetchSkillFromGithub(for githubString: String) async throws -> String? {
-        guard let githubURL = URL(string: githubString) else {
-            throw SkyllError.invalidURL
-        }
-        guard let mkURL = githubSkillMarkdownURL(from: githubURL) else {
-            throw SkyllError.invalidURL
+            throw SkyllError.requestFailed(statusCode: response.statusCode, body: body)
         }
 
-        let (data, httpResponse) = try await transport.send(URLRequest(url: mkURL))
-   
-        guard 200..<300 ~= httpResponse.statusCode else {
-            let body = String(data: data, encoding: .utf8)
-            throw SkyllError.requestFailed(statusCode: httpResponse.statusCode, body: body)
-        }
-        return String(data: data, encoding: .utf8)
+        return data
     }
 
-    private func githubSkillMarkdownURL(from githubURL: URL?) -> URL? {
-        guard let githubURL, githubURL.host == "github.com" else { return nil }
+    private func githubSkillMarkdownURL(from githubURL: URL) -> URL? {
+        guard githubURL.host == "github.com" else { return nil }
 
         let components = githubURL.pathComponents
         guard components.count >= 6, components[3] == "tree" else { return nil }
@@ -162,5 +212,4 @@ public struct SkyllClient: Sendable {
 
         return URL(string: "https://raw.githubusercontent.com/\(owner)/\(repo)/\(branch)/\(path)/SKILL.md")
     }
-
 }
