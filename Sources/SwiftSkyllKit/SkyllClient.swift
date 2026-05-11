@@ -112,4 +112,52 @@ public struct SkyllClient: Sendable {
         }
     }
 
+    // get the SKILL.md content using the SkyllSkill refs raw string
+    public func fetchSkillFromRaw(for rawString: String) async throws -> String? {
+        guard let rawURL = URL(string: rawString) else {
+            throw SkyllError.invalidURL
+        }
+        
+        let (data, httpResponse) = try await transport.send(URLRequest(url: rawURL))
+        
+        guard 200..<300 ~= httpResponse.statusCode else {
+            let body = String(data: data, encoding: .utf8)
+            throw SkyllError.requestFailed(statusCode: httpResponse.statusCode, body: body)
+        }
+        
+        return String(data: data, encoding: .utf8)
+    }
+ 
+    // get the SKILL.md content using the SkyllSkill refs github string
+    public func fetchSkillFromGithub(for githubString: String) async throws -> String? {
+        guard let githubURL = URL(string: githubString) else {
+            throw SkyllError.invalidURL
+        }
+        guard let mkURL = githubSkillMarkdownURL(from: githubURL) else {
+            throw SkyllError.invalidURL
+        }
+
+        let (data, httpResponse) = try await transport.send(URLRequest(url: mkURL))
+   
+        guard 200..<300 ~= httpResponse.statusCode else {
+            let body = String(data: data, encoding: .utf8)
+            throw SkyllError.requestFailed(statusCode: httpResponse.statusCode, body: body)
+        }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func githubSkillMarkdownURL(from githubURL: URL?) -> URL? {
+        guard let githubURL, githubURL.host == "github.com" else { return nil }
+
+        let components = githubURL.pathComponents
+        guard components.count >= 6, components[3] == "tree" else { return nil }
+
+        let owner = components[1]
+        let repo = components[2]
+        let branch = components[4]
+        let path = components.dropFirst(5).joined(separator: "/")
+
+        return URL(string: "https://raw.githubusercontent.com/\(owner)/\(repo)/\(branch)/\(path)/SKILL.md")
+    }
+
 }
