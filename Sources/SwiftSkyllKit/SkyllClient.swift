@@ -10,19 +10,16 @@ import Foundation
 public struct SkyllClient: Sendable {
     private let configuration: SkyllConfiguration
     private let transport: any SkyllTransport
-    private let decoder: JSONDecoder
-    private let encoder: JSONEncoder
+    
+    private let decoder: JSONDecoder = JSONDecoder()
+    private let encoder: JSONEncoder = JSONEncoder()
 
     public init(
         configuration: SkyllConfiguration = SkyllConfiguration(),
-        transport: any SkyllTransport = URLSessionTransport(),
-        decoder: JSONDecoder = JSONDecoder(),
-        encoder: JSONEncoder = JSONEncoder()
+        transport: any SkyllTransport = URLSessionTransport()
     ) {
         self.configuration = configuration
         self.transport = transport
-        self.decoder = decoder
-        self.encoder = encoder
     }
 
     // MARK: - Search
