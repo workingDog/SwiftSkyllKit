@@ -33,6 +33,9 @@ Skyll is useful when your app needs to:
 - Small API surface suitable for app integration
 - Configurable base URL for hosted or self-hosted Skyll servers
 
+If the `SKILL.md` content is not returned in the search results, but GitHub or raw references are available, retrieval from those sources is also supported.  
+
+
 ## Installation
 
 Add the package to your project in Xcode using the package URL, or add it to `Package.swift`:

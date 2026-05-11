@@ -146,6 +146,7 @@ public struct SkyllClient: Sendable {
         return String(data: data, encoding: .utf8)
     }
 
+    // private
     private func githubSkillMarkdownURL(from githubURL: URL?) -> URL? {
         guard let githubURL, githubURL.host == "github.com" else { return nil }
 
