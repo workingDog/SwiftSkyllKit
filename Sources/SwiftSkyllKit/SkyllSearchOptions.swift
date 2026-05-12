@@ -11,11 +11,13 @@ public struct SkyllSearchOptions: Sendable {
     public var limit: Int
     public var includeContent: Bool
     public var includeReferences: Bool
+    public var includeRaw: Bool
 
-    public init(limit: Int = 10, includeContent: Bool = true, includeReferences: Bool = false) {
+    public init(limit: Int = 10, includeContent: Bool = true, includeReferences: Bool = false, includeRaw: Bool = false) {
         self.limit = limit
         self.includeContent = includeContent
         self.includeReferences = includeReferences
+        self.includeRaw = includeRaw
     }
 }
 

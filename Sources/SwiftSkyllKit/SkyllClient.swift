@@ -28,6 +28,7 @@ public struct SkyllClient: Sendable {
         query: String,
         limit: Int = 10,
         includeContent: Bool = true,
+        includeRaw: Bool = false,
         includeReferences: Bool = false
     ) async throws -> [SkyllSkill] {
         let response: SkyllSearchResponse = try await perform(
@@ -35,6 +36,7 @@ public struct SkyllClient: Sendable {
                 query: query,
                 limit: limit,
                 includeContent: includeContent,
+                includeRaw: includeRaw,
                 includeReferences: includeReferences
             )
         )
@@ -49,6 +51,7 @@ public struct SkyllClient: Sendable {
             query: query,
             limit: options.limit,
             includeContent: options.includeContent,
+            includeRaw: options.includeRaw,
             includeReferences: options.includeReferences
         )
     }
@@ -57,6 +60,7 @@ public struct SkyllClient: Sendable {
         query: String,
         limit: Int = 10,
         includeContent: Bool = true,
+        includeRaw: Bool = false,
         includeReferences: Bool = false
     ) async throws -> SkyllSearchResponse {
         try await perform(
@@ -64,6 +68,7 @@ public struct SkyllClient: Sendable {
                 query: query,
                 limit: limit,
                 includeContent: includeContent,
+                includeRaw: includeRaw,
                 includeReferences: includeReferences
             )
         )
@@ -77,18 +82,50 @@ public struct SkyllClient: Sendable {
             query: query,
             limit: options.limit,
             includeContent: options.includeContent,
+            includeRaw: options.includeRaw,
             includeReferences: options.includeReferences
         )
     }
 
-    // MARK: - Skill Fetching
-
-    public func getSkill(named name: String) async throws -> SkyllSkill {
-        try await perform(.skillByName(name))
+    public func search(request: SkyllSearchRequest) async throws -> SkyllSearchResponse {
+        try await postJSON(body: request, as: SkyllSearchResponse.self)
     }
 
-    public func getSkill(source: String, id: String) async throws -> SkyllSkill {
-        try await perform(.skill(source: source, id: id))
+    public func searchSkills(request: SkyllSearchRequest) async throws -> [SkyllSkill] {
+        let response = try await search(request: request)
+        return response.skills
+    }
+
+    // MARK: - Skill Fetching
+
+    public func getSkill(
+        named name: String,
+        includeRaw: Bool = false,
+        includeReferences: Bool = false
+    ) async throws -> SkyllSkill {
+        try await perform(
+            .skillByName(
+                name,
+                includeRaw: includeRaw,
+                includeReferences: includeReferences
+            )
+        )
+    }
+
+    public func getSkill(
+        source: String,
+        id: String,
+        includeRaw: Bool = false,
+        includeReferences: Bool = false
+    ) async throws -> SkyllSkill {
+        try await perform(
+            .skill(
+                source: source,
+                id: id,
+                includeRaw: includeRaw,
+                includeReferences: includeReferences
+            )
+        )
     }
 
     public func health() async throws -> SkyllHealthResponse {

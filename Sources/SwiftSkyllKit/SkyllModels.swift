@@ -19,6 +19,35 @@ public struct SkyllSearchResponse: Codable, Sendable {
     public let skills: [SkyllSkill]
 }
 
+public struct SkyllSearchRequest: Codable, Sendable {
+    public let query: String
+    public let limit: Int
+    public let includeContent: Bool
+    public let includeRaw: Bool
+    public let includeReferences: Bool
+
+    public init(
+        query: String,
+        limit: Int = 10,
+        includeContent: Bool = true,
+        includeRaw: Bool = false,
+        includeReferences: Bool = false
+    ) {
+        self.query = query
+        self.limit = limit
+        self.includeContent = includeContent
+        self.includeRaw = includeRaw
+        self.includeReferences = includeReferences
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case query, limit
+        case includeContent = "include_content"
+        case includeRaw = "include_raw"
+        case includeReferences = "include_references"
+    }
+}
+
 public struct SkyllSkill: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let title: String
@@ -71,15 +100,29 @@ public struct SkyllReference: Codable, Hashable, Sendable {
     public let name: String?
     public let path: String?
     public let content: String?
+    public let rawURL: String?
 
-    public init(name: String? = nil, path: String? = nil, content: String? = nil) {
+    public init(name: String? = nil, path: String? = nil, content: String? = nil, rawURL: String? = nil) {
         self.name = name
         self.path = path
         self.content = content
+        self.rawURL = rawURL
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case name, path, content
+        case rawURL = "raw_url"
     }
 }
 
 public struct SkyllHealthResponse: Codable, Hashable, Sendable {
     public let status: String
+    public let version: String?
+    public let cacheStats: [String: Int]?
+
+    public enum CodingKeys: String, CodingKey {
+        case status, version
+        case cacheStats = "cache_stats"
+    }
 }
 

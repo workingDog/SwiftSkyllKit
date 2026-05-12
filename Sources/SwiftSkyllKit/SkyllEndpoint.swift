@@ -12,17 +12,27 @@ public enum SkyllEndpoint: Sendable {
         query: String,
         limit: Int = 10,
         includeContent: Bool = true,
+        includeRaw: Bool = false,
         includeReferences: Bool = false
     )
-    case skillByName(String)
-    case skill(source: String, id: String)
+    case skillByName(
+        String,
+        includeRaw: Bool = false,
+        includeReferences: Bool = false
+    )
+    case skill(
+        source: String,
+        id: String,
+        includeRaw: Bool = false,
+        includeReferences: Bool = false
+    )
     case health
 
     func makeRequest(configuration: SkyllConfiguration) throws -> URLRequest {
         let url: URL
 
         switch self {
-        case let .search(query, limit, includeContent, includeReferences):
+        case let .search(query, limit, includeContent, includeRaw, includeReferences):
             guard var components = URLComponents(
                 url: configuration.baseURL.appending(path: "/search"),
                 resolvingAgainstBaseURL: false
@@ -34,6 +44,7 @@ public enum SkyllEndpoint: Sendable {
                 URLQueryItem(name: "q", value: query),
                 URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "include_content", value: includeContent ? "true" : "false"),
+                URLQueryItem(name: "include_raw", value: includeRaw ? "true" : "false"),
                 URLQueryItem(name: "include_references", value: includeReferences ? "true" : "false")
             ]
 
@@ -42,13 +53,43 @@ public enum SkyllEndpoint: Sendable {
             }
             url = builtURL
 
-        case let .skillByName(name):
-            url = configuration.baseURL.appending(path: "/skill/\(name)")
+        case let .skillByName(name, includeRaw, includeReferences):
+            guard var components = URLComponents(
+                url: configuration.baseURL.appending(path: "/skill/\(name)"),
+                resolvingAgainstBaseURL: false
+            ) else {
+                throw SkyllError.invalidURL
+            }
 
-        case let .skill(source, id):
+            components.queryItems = [
+                URLQueryItem(name: "include_raw", value: includeRaw ? "true" : "false"),
+                URLQueryItem(name: "include_references", value: includeReferences ? "true" : "false")
+            ]
+
+            guard let builtURL = components.url else {
+                throw SkyllError.invalidURL
+            }
+            url = builtURL
+
+        case let .skill(source, id, includeRaw, includeReferences):
             let encodedSource = source.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? source
             let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
-            url = configuration.baseURL.appending(path: "/skills/\(encodedSource)/\(encodedID)")
+            guard var components = URLComponents(
+                url: configuration.baseURL.appending(path: "/skills/\(encodedSource)/\(encodedID)"),
+                resolvingAgainstBaseURL: false
+            ) else {
+                throw SkyllError.invalidURL
+            }
+
+            components.queryItems = [
+                URLQueryItem(name: "include_raw", value: includeRaw ? "true" : "false"),
+                URLQueryItem(name: "include_references", value: includeReferences ? "true" : "false")
+            ]
+
+            guard let builtURL = components.url else {
+                throw SkyllError.invalidURL
+            }
+            url = builtURL
 
         case .health:
             url = configuration.baseURL.appending(path: "/health")

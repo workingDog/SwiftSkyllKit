@@ -54,7 +54,14 @@ private let sampleSkillJSON = """
       "version": "1.0.0"
     }
   },
-  "references": [],
+  "references": [
+    {
+      "name": "guide.md",
+      "path": "skills/swiftui-skill/references/guide.md",
+      "content": "# Guide",
+      "raw_url": "https://raw.githubusercontent.com/example/repo/main/skills/swiftui-skill/references/guide.md"
+    }
+  ],
   "fetch_error": null
 }
 """
@@ -113,6 +120,7 @@ func searchOptionsBecomeQueryItems() async throws {
         #expect(value("q") == "swiftdata")
         #expect(value("limit") == "25")
         #expect(value("include_content") == "false")
+        #expect(value("include_raw") == "true")
         #expect(value("include_references") == "true")
 
         let response = makeHTTPResponse(url: request.url!)
@@ -122,7 +130,7 @@ func searchOptionsBecomeQueryItems() async throws {
     let client = SkyllClient(transport: transport)
     _ = try await client.search(
         query: "swiftdata",
-        options: .init(limit: 25, includeContent: false, includeReferences: true)
+        options: .init(limit: 25, includeContent: false, includeReferences: true, includeRaw: true)
     )
 }
 
@@ -130,27 +138,56 @@ func searchOptionsBecomeQueryItems() async throws {
 func getSkillByNameDecodesSkill() async throws {
     let transport = MockTransport { request in
         #expect(request.url?.path.contains("/skill/swiftui-skill") == true)
+        let components = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)
+        let queryItems = components?.queryItems ?? []
+
+        func value(_ name: String) -> String? {
+            queryItems.first(where: { $0.name == name })?.value
+        }
+
+        #expect(value("include_raw") == "true")
+        #expect(value("include_references") == "true")
+
         let response = makeHTTPResponse(url: request.url!)
         return (Data(sampleSkillJSON.utf8), response)
     }
 
     let client = SkyllClient(transport: transport)
-    let skill = try await client.getSkill(named: "swiftui-skill")
+    let skill = try await client.getSkill(
+        named: "swiftui-skill",
+        includeRaw: true,
+        includeReferences: true
+    )
 
     #expect(skill.title == "SwiftUI Skill")
     #expect(skill.source == "workingdog/swift-skills")
+    #expect(skill.references.first?.rawURL == "https://raw.githubusercontent.com/example/repo/main/skills/swiftui-skill/references/guide.md")
 }
 
 @Test
 func getSkillBySourceAndIDDecodesSkill() async throws {
     let transport = MockTransport { request in
         #expect(request.url?.path.contains("/skills/workingdog/swift-skills/swiftui-skill") == true)
+        let components = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)
+        let queryItems = components?.queryItems ?? []
+
+        func value(_ name: String) -> String? {
+            queryItems.first(where: { $0.name == name })?.value
+        }
+
+        #expect(value("include_raw") == "true")
+        #expect(value("include_references") == "false")
+
         let response = makeHTTPResponse(url: request.url!)
         return (Data(sampleSkillJSON.utf8), response)
     }
 
     let client = SkyllClient(transport: transport)
-    let skill = try await client.getSkill(source: "workingdog/swift-skills", id: "swiftui-skill")
+    let skill = try await client.getSkill(
+        source: "workingdog/swift-skills",
+        id: "swiftui-skill",
+        includeRaw: true
+    )
 
     #expect(skill.id == "swiftui-skill")
 }
@@ -158,7 +195,14 @@ func getSkillBySourceAndIDDecodesSkill() async throws {
 @Test
 func healthDecodesResponse() async throws {
     let json = """
-    { "status": "ok" }
+    {
+      "status": "healthy",
+      "version": "0.1.0",
+      "cache_stats": {
+        "hits": 4,
+        "misses": 2
+      }
+    }
     """
 
     let transport = MockTransport { request in
@@ -170,7 +214,43 @@ func healthDecodesResponse() async throws {
     let client = SkyllClient(transport: transport)
     let health = try await client.health()
 
-    #expect(health.status == "ok")
+    #expect(health.status == "healthy")
+    #expect(health.version == "0.1.0")
+    #expect(health.cacheStats?["hits"] == 4)
+}
+
+@Test
+func typedPostSearchEncodesCurrentSkyllRequestShape() async throws {
+    let transport = MockTransport { request in
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.path.contains("/search") == true)
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+
+        let body = try #require(request.httpBody)
+        let payload = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+
+        #expect(payload?["query"] as? String == "swift concurrency")
+        #expect(payload?["limit"] as? Int == 3)
+        #expect(payload?["include_content"] as? Bool == true)
+        #expect(payload?["include_raw"] as? Bool == true)
+        #expect(payload?["include_references"] as? Bool == true)
+
+        let response = makeHTTPResponse(url: request.url!)
+        return (Data(sampleSearchJSON.utf8), response)
+    }
+
+    let client = SkyllClient(transport: transport)
+    let result = try await client.search(
+        request: .init(
+            query: "swift concurrency",
+            limit: 3,
+            includeContent: true,
+            includeRaw: true,
+            includeReferences: true
+        )
+    )
+
+    #expect(result.count == 1)
 }
 
 @Test
@@ -313,3 +393,4 @@ func pathComponentsAreURLSafeForSourceAndID() async throws {
     let client = SkyllClient(transport: transport)
     _ = try await client.getSkill(source: "owner/repo with spaces", id: "skill name")
 }
+

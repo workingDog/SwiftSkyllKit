@@ -41,7 +41,7 @@ If the `SKILL.md` content is not returned in the search results, but GitHub or r
 
 Add the package to your project in Xcode using the package URL, or add it to `Package.swift`:
 
-     .package(url: "https://github.com/workingDog/SwiftSkyllKit.git", from: "v0.2.0")
+     .package(url: "https://github.com/workingDog/SwiftSkyllKit.git", from: "0.3.0")
 
 See also [SkyllViewer](https://github.com/workingDog/SkyllViewer) for a basic use of **SwiftSkyllKit**
 
